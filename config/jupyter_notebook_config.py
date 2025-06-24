@@ -16,8 +16,8 @@ c.NotebookApp.ip = '0.0.0.0'
 c.ServerApp.ip = '0.0.0.0'
 
 # Port configuration
-c.NotebookApp.port = 8888
-c.ServerApp.port = 8888
+c.NotebookApp.port = 7654
+c.ServerApp.port = 7654
 
 # Disable token and password for local development
 # WARNING: Only use this for local development!

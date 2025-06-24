@@ -1,278 +1,281 @@
-# jupyter-multilang:latest - Comprehensive multi-language Jupyter environment
-
-# Language versions
-ARG GOLANG_VERSION=1.21.5
-ARG JULIA_VERSION=1.10.0
-ARG RUST_VERSION=1.75.0
-ARG NODE_VERSION=20.10.0
-
 # =============================================================================
-# Base system dependencies stage
+# JupyterLab Multi-Language Docker Environment
+# Version-agnostic with specific exceptions for C++, Java, and Python
 # =============================================================================
-FROM ubuntu:22.04 AS system-base
-LABEL stage=system-base
 
+# Language version arguments
+ARG GOLANG_VERSION=1.23.4
+ARG JULIA_VERSION=1.11.2
+ARG RUST_VERSION=1.83.0
+ARG NODE_VERSION=22-bullseye
+
+# Multi-stage builds for language environments
+FROM golang:${GOLANG_VERSION}-bullseye as golang
+FROM julia:${JULIA_VERSION}-bullseye as julia
+FROM rust:${RUST_VERSION}-bullseye as rust
+FROM node:${NODE_VERSION} as node
+FROM openjdk:11-jdk-bullseye as java11
+FROM openjdk:17-jdk-bullseye as java17
+
+# Main image based on Python 3.13
+FROM python:3.13-bullseye
+
+LABEL maintainer="JupyterLab Multi-Language Environment"
+LABEL description="Version-agnostic JupyterLab with specific C++, Java, Python versions"
+LABEL version="3.0.0"
+
+# Environment setup
 ENV DEBIAN_FRONTEND=noninteractive
-ENV HOME=/root
 ENV NOTEBOOK_DIR=/notebooks
 ENV JUPYTER_CONFIG_DIR=/config
 
-# Install system dependencies and development tools
+# Install system dependencies
 RUN apt-get update && apt-get upgrade -y && \
     apt-get install -y --no-install-recommends \
     # Build essentials
     build-essential \
     cmake \
     pkg-config \
+    make \
+    # Compilers and tools
+    gcc g++ gfortran \
     # Utilities
-    curl \
-    wget \
-    git \
-    gnupg \
-    ca-certificates \
-    lsb-release \
+    curl wget git vim nano \
+    gnupg ca-certificates lsb-release \
     software-properties-common \
-    # Python build dependencies
-    python3 \
-    python3-pip \
-    python3-dev \
-    python3-venv \
-    # Libraries
-    libzmq3-dev \
-    libczmq-dev \
-    libssl-dev \
-    libffi-dev \
-    libbz2-dev \
-    libreadline-dev \
-    libsqlite3-dev \
-    libncursesw5-dev \
-    xz-utils \
-    tk-dev \
-    libxml2-dev \
-    libxmlsec1-dev \
-    liblzma-dev \
-    # Fonts
-    fonts-liberation \
-    fonts-dejavu-core \
-    # Locale
-    locales \
+    apt-transport-https \
+    # Development libraries
+    libzmq3-dev libczmq-dev \
+    libssl-dev libffi-dev \
+    libbz2-dev libreadline-dev \
+    libsqlite3-dev libncursesw5-dev \
+    xz-utils tk-dev \
+    libxml2-dev libxmlsec1-dev liblzma-dev \
+    # Additional dependencies
+    unzip tar gzip locales \
+    fonts-liberation fonts-dejavu-core \
+    # Python 2.7 dependencies
+    python2.7 python2.7-dev \
+    && locale-gen en_US.UTF-8 \
     && rm -rf /var/lib/apt/lists/*
 
-# Set locale
-RUN locale-gen en_US.UTF-8
 ENV LANG=en_US.UTF-8
 ENV LC_ALL=en_US.UTF-8
 
 # =============================================================================
-# Python base and Jupyter stage
+# Install JupyterLab and extensions
 # =============================================================================
-FROM system-base AS python-jupyter
-LABEL stage=python-jupyter
-
-# Install Miniconda
-RUN wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -O /tmp/miniconda.sh && \
-    bash /tmp/miniconda.sh -b -p /opt/conda && \
-    rm /tmp/miniconda.sh && \
-    /opt/conda/bin/conda clean -a -y
-
-ENV PATH=/opt/conda/bin:$PATH
-
-# Install mamba for faster conda operations
-RUN conda install -n base -c conda-forge mamba -y && \
-    conda clean -a -y
-
 # Install JupyterLab and core packages
-RUN mamba install -y -c conda-forge \
-    python=3.11 \
-    jupyterlab=4.0 \
+RUN pip install --no-cache-dir \
+    jupyterlab==4.0.* \
     notebook \
+    ipykernel \
     ipywidgets \
-    jupyter_contrib_nbextensions \
-    jupyter_nbextensions_configurator \
-    nb_conda_kernels \
-    pandas \
-    numpy \
-    matplotlib \
-    scipy \
-    scikit-learn \
-    seaborn \
-    plotly \
-    && mamba clean -a -y
+    jupyter-console \
+    nbconvert
 
 # =============================================================================
-# Multiple Python versions stage
+# Python Versions (2.7, 3.13, 3.14-beta)
 # =============================================================================
-FROM python-jupyter AS python-versions
-LABEL stage=python-versions
 
-# Python 2.7 (from deadsnakes PPA for Ubuntu)
-RUN add-apt-repository ppa:deadsnakes/ppa && \
-    apt-get update && \
-    apt-get install -y python2.7 python2.7-dev && \
-    curl https://bootstrap.pypa.io/pip/2.7/get-pip.py --output get-pip.py && \
+# Python 3.13 is already installed as base
+RUN python -m ipykernel install --name python3.13 --display-name "Python 3.13"
+
+# Python 2.7
+RUN curl https://bootstrap.pypa.io/pip/2.7/get-pip.py -o get-pip.py && \
     python2.7 get-pip.py && \
-    rm get-pip.py && \
     python2.7 -m pip install ipykernel && \
-    python2.7 -m ipykernel install --name python2 --display-name "Python 2.7" && \
-    rm -rf /var/lib/apt/lists/*
-
-# Python 3.7
-RUN mamba create -n py37 python=3.7 ipykernel numpy pandas matplotlib -y && \
-    /opt/conda/envs/py37/bin/python -m ipykernel install --name python3.7 --display-name "Python 3.7" && \
-    mamba clean -a -y
-
-# Python 3.11 (already installed as base)
-RUN python -m ipykernel install --name python3.11 --display-name "Python 3.11"
-
-# Python 3.12
-RUN mamba create -n py312 python=3.12 ipykernel numpy pandas matplotlib -y && \
-    /opt/conda/envs/py312/bin/python -m ipykernel install --name python3.12 --display-name "Python 3.12" && \
-    mamba clean -a -y
-
-# Python 3.13
-RUN mamba create -n py313 python=3.13 ipykernel numpy pandas matplotlib -y && \
-    /opt/conda/envs/py313/bin/python -m ipykernel install --name python3.13 --display-name "Python 3.13" && \
-    mamba clean -a -y
+    python2.7 -m ipykernel install --name python2.7 --display-name "Python 2.7" && \
+    rm get-pip.py
 
 # Python 3.14 beta (build from source)
-RUN apt-get update && \
-    apt-get install -y build-essential gdb lcov pkg-config \
-    libbz2-dev libffi-dev libgdbm-dev libgdbm-compat-dev liblzma-dev \
-    libncurses5-dev libreadline6-dev libsqlite3-dev libssl-dev \
-    lzma lzma-dev tk-dev uuid-dev zlib1g-dev && \
-    cd /tmp && \
-    wget https://www.python.org/ftp/python/3.14.0/Python-3.14.0a2.tgz && \
-    tar xzf Python-3.14.0a2.tgz && \
-    cd Python-3.14.0a2 && \
+RUN cd /tmp && \
+    wget -q https://www.python.org/ftp/python/3.14.0/Python-3.14.0a3.tgz && \
+    tar xzf Python-3.14.0a3.tgz && \
+    cd Python-3.14.0a3 && \
     ./configure --enable-optimizations --prefix=/opt/python3.14 && \
     make -j$(nproc) && \
     make install && \
-    /opt/python3.14/bin/python3 -m pip install --upgrade pip && \
-    /opt/python3.14/bin/python3 -m pip install ipykernel && \
+    /opt/python3.14/bin/python3 -m pip install --upgrade pip ipykernel && \
     /opt/python3.14/bin/python3 -m ipykernel install --name python3.14 --display-name "Python 3.14 (beta)" && \
-    cd / && rm -rf /tmp/Python-3.14* && \
-    rm -rf /var/lib/apt/lists/*
+    cd / && rm -rf /tmp/Python-*
 
 # =============================================================================
-# C++ compilers and kernels stage
+# C++ Versions (11, 14, 17, 23, 26-beta)
 # =============================================================================
-FROM python-versions AS cpp-stage
-LABEL stage=cpp-stage
 
-# Install modern C++ compilers
-RUN add-apt-repository ppa:ubuntu-toolchain-r/test && \
-    apt-get update && \
-    apt-get install -y gcc-13 g++-13 clang-15 && \
-    update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-13 100 && \
-    update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-13 100 && \
-    rm -rf /var/lib/apt/lists/*
+# Install Miniconda for xeus-cling
+RUN wget -q https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -O /tmp/miniconda.sh && \
+    bash /tmp/miniconda.sh -b -p /opt/miniconda && \
+    rm /tmp/miniconda.sh && \
+    /opt/miniconda/bin/conda install -y -c conda-forge xeus-cling && \
+    /opt/miniconda/bin/conda clean -a -y
 
-# Install xeus-cling C++ kernel
-RUN mamba install -y -c conda-forge xeus-cling && \
-    mamba clean -a -y
-
-# Create C++23 and C++26 kernel specifications
-RUN mkdir -p /opt/conda/share/jupyter/kernels/cpp23 && \
-    echo '{"display_name": "C++23", "argv": ["xcpp", "-std=c++23", "-f", "{connection_file}"], "language": "c++"}' > \
-    /opt/conda/share/jupyter/kernels/cpp23/kernel.json && \
-    mkdir -p /opt/conda/share/jupyter/kernels/cpp26 && \
-    echo '{"display_name": "C++26 (experimental)", "argv": ["xcpp", "-std=c++26", "-f", "{connection_file}"], "language": "c++"}' > \
-    /opt/conda/share/jupyter/kernels/cpp26/kernel.json
+# Create kernel specifications for different C++ standards
+RUN mkdir -p /usr/local/share/jupyter/kernels/cpp11 && \
+    echo '{"display_name": "C++11", "argv": ["/opt/miniconda/bin/xcpp", "-std=c++11", "-f", "{connection_file}"], "language": "c++"}' > \
+    /usr/local/share/jupyter/kernels/cpp11/kernel.json && \
+    \
+    mkdir -p /usr/local/share/jupyter/kernels/cpp14 && \
+    echo '{"display_name": "C++14", "argv": ["/opt/miniconda/bin/xcpp", "-std=c++14", "-f", "{connection_file}"], "language": "c++"}' > \
+    /usr/local/share/jupyter/kernels/cpp14/kernel.json && \
+    \
+    mkdir -p /usr/local/share/jupyter/kernels/cpp17 && \
+    echo '{"display_name": "C++17", "argv": ["/opt/miniconda/bin/xcpp", "-std=c++17", "-f", "{connection_file}"], "language": "c++"}' > \
+    /usr/local/share/jupyter/kernels/cpp17/kernel.json && \
+    \
+    mkdir -p /usr/local/share/jupyter/kernels/cpp23 && \
+    echo '{"display_name": "C++23", "argv": ["/opt/miniconda/bin/xcpp", "-std=c++23", "-f", "{connection_file}"], "language": "c++"}' > \
+    /usr/local/share/jupyter/kernels/cpp23/kernel.json && \
+    \
+    mkdir -p /usr/local/share/jupyter/kernels/cpp26 && \
+    echo '{"display_name": "C++26 (beta)", "argv": ["/opt/miniconda/bin/xcpp", "-std=c++2c", "-f", "{connection_file}"], "language": "c++"}' > \
+    /usr/local/share/jupyter/kernels/cpp26/kernel.json
 
 # =============================================================================
-# Java versions stage
+# Java Versions (11, 17, 24-beta)
 # =============================================================================
-FROM cpp-stage AS java-stage
-LABEL stage=java-stage
 
-# Install multiple Java versions
-RUN apt-get update && \
-    apt-get install -y wget unzip && \
-    mkdir -p /opt/java && \
-    cd /opt/java && \
-    # Java 14
-    wget https://download.java.net/java/GA/jdk14.0.2/205943a0976c4ed48cb16f1043c5c647/12/GPL/openjdk-14.0.2_linux-x64_bin.tar.gz && \
-    tar xzf openjdk-14.0.2_linux-x64_bin.tar.gz && \
-    rm openjdk-14.0.2_linux-x64_bin.tar.gz && \
-    # Java 17
-    wget https://download.java.net/java/GA/jdk17.0.2/dfd4a8d0985749f896bed50d7138ee7f/8/GPL/openjdk-17.0.2_linux-x64_bin.tar.gz && \
-    tar xzf openjdk-17.0.2_linux-x64_bin.tar.gz && \
-    rm openjdk-17.0.2_linux-x64_bin.tar.gz && \
-    # Java 21
-    wget https://download.java.net/java/GA/jdk21.0.1/415e3f918a1f4062a0074a2794853d0d/12/GPL/openjdk-21.0.1_linux-x64_bin.tar.gz && \
-    tar xzf openjdk-21.0.1_linux-x64_bin.tar.gz && \
-    rm openjdk-21.0.1_linux-x64_bin.tar.gz && \
-    # Java 24 EA (if available)
-    (wget https://download.java.net/java/early_access/jdk24/1/GPL/openjdk-24-ea+1_linux-x64_bin.tar.gz && \
-    tar xzf openjdk-24-ea+1_linux-x64_bin.tar.gz && \
-    rm openjdk-24-ea+1_linux-x64_bin.tar.gz || echo "Java 24 EA not available") && \
-    rm -rf /var/lib/apt/lists/*
+# Copy Java installations from multi-stage builds
+COPY --from=java11 /usr/local/openjdk-11 /opt/java/jdk-11
+COPY --from=java17 /usr/local/openjdk-17 /opt/java/jdk-17
+
+# Try to get Java 24 EA
+RUN cd /opt/java && \
+    (wget -q https://download.java.net/java/early_access/jdk24/latest/GPL/openjdk-24-ea_linux-x64_bin.tar.gz && \
+    tar xzf openjdk-24-ea_linux-x64_bin.tar.gz && \
+    rm openjdk-24-ea_linux-x64_bin.tar.gz && \
+    mv jdk-24* jdk-24) || echo "Java 24 EA not available"
 
 # Install IJava kernel
 RUN cd /tmp && \
-    wget https://github.com/SpencerPark/IJava/releases/download/v1.3.0/ijava-1.3.0.zip && \
-    unzip ijava-1.3.0.zip && \
-    # Java 14 kernel
-    JAVA_HOME=/opt/java/jdk-14.0.2 python install.py --sys-prefix --display-name "Java 14" && \
-    # Java 17 kernel
-    JAVA_HOME=/opt/java/jdk-17.0.2 python install.py --sys-prefix --display-name "Java 17" && \
-    # Java 21 kernel
-    JAVA_HOME=/opt/java/jdk-21.0.1 python install.py --sys-prefix --display-name "Java 21" && \
-    # Java 24 kernel (if available)
-    (test -d /opt/java/jdk-24 && JAVA_HOME=/opt/java/jdk-24 python install.py --sys-prefix --display-name "Java 24 EA" || echo "Skipping Java 24") && \
+    wget -q https://github.com/SpencerPark/IJava/releases/download/v1.3.0/ijava-1.3.0.zip && \
+    unzip -q ijava-1.3.0.zip && \
+    # Java 11
+    JAVA_HOME=/opt/java/jdk-11 python install.py --sys-prefix && \
+    mv /usr/local/share/jupyter/kernels/java /usr/local/share/jupyter/kernels/java11 && \
+    sed -i 's/"display_name": "Java"/"display_name": "Java 11"/' /usr/local/share/jupyter/kernels/java11/kernel.json && \
+    # Java 17
+    JAVA_HOME=/opt/java/jdk-17 python install.py --sys-prefix && \
+    mv /usr/local/share/jupyter/kernels/java /usr/local/share/jupyter/kernels/java17 && \
+    sed -i 's/"display_name": "Java"/"display_name": "Java 17"/' /usr/local/share/jupyter/kernels/java17/kernel.json && \
+    # Java 24 if available
+    if [ -d /opt/java/jdk-24 ]; then \
+    JAVA_HOME=/opt/java/jdk-24 python install.py --sys-prefix && \
+    mv /usr/local/share/jupyter/kernels/java /usr/local/share/jupyter/kernels/java24 && \
+    sed -i 's/"display_name": "Java"/"display_name": "Java 24 (beta)"/' /usr/local/share/jupyter/kernels/java24/kernel.json; \
+    fi && \
     rm -rf /tmp/ijava*
 
 # =============================================================================
-# Other languages stage
+# Go (latest stable)
 # =============================================================================
-FROM java-stage AS other-languages
-LABEL stage=other-languages
+ENV GOPATH=/go
+ENV PATH=$GOPATH/bin:/usr/local/go/bin:$PATH
+COPY --from=golang /usr/local/go/ /usr/local/go/
 
-# R language
-RUN mamba install -y -c conda-forge r-base r-irkernel r-tidyverse r-ggplot2 r-plotly && \
-    mamba clean -a -y
-
-# Julia
-RUN cd /opt && \
-    wget https://julialang-s3.julialang.org/bin/linux/x64/${JULIA_VERSION%.*}/julia-${JULIA_VERSION}-linux-x86_64.tar.gz && \
-    tar xzf julia-${JULIA_VERSION}-linux-x86_64.tar.gz && \
-    rm julia-${JULIA_VERSION}-linux-x86_64.tar.gz && \
-    ln -s /opt/julia-${JULIA_VERSION}/bin/julia /usr/local/bin/julia && \
-    julia -e 'using Pkg; Pkg.add("IJulia")'
-
-# Go
-RUN cd /opt && \
-    wget https://go.dev/dl/go${GOLANG_VERSION}.linux-amd64.tar.gz && \
-    tar xzf go${GOLANG_VERSION}.linux-amd64.tar.gz && \
-    rm go${GOLANG_VERSION}.linux-amd64.tar.gz && \
-    ln -s /opt/go/bin/go /usr/local/bin/go && \
-    export PATH=/opt/go/bin:$PATH && \
-    go install github.com/gopherdata/gophernotes@latest && \
-    mkdir -p /opt/conda/share/jupyter/kernels/gophernotes && \
-    cp $HOME/go/pkg/mod/github.com/gopherdata/gophernotes@*/kernel/* /opt/conda/share/jupyter/kernels/gophernotes/ && \
-    cd /opt/conda/share/jupyter/kernels/gophernotes && \
+RUN go install github.com/gopherdata/gophernotes@latest && \
+    mkdir -p /usr/local/share/jupyter/kernels/gophernotes && \
+    cd /usr/local/share/jupyter/kernels/gophernotes && \
+    cp "$(go env GOPATH)"/pkg/mod/github.com/gopherdata/gophernotes@*/kernel/* . && \
     chmod +w kernel.json && \
-    sed -i "s|gophernotes|$HOME/go/bin/gophernotes|" kernel.json
+    sed "s|gophernotes|$(go env GOPATH)/bin/gophernotes|" < kernel.json.in > kernel.json
 
-# Rust
-RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain ${RUST_VERSION} && \
-    export PATH=$HOME/.cargo/bin:$PATH && \
-    cargo install evcxr_jupyter && \
+# =============================================================================
+# Julia (latest stable)
+# =============================================================================
+ENV JULIA_PATH=/usr/local/julia
+ENV PATH=${JULIA_PATH}/bin:$PATH
+COPY --from=julia ${JULIA_PATH} ${JULIA_PATH}
+
+RUN julia -e 'using Pkg; Pkg.add("IJulia"); Pkg.add("DataFrames"); Pkg.add("CSV"); Pkg.add("Plots"); Pkg.add("PlotlyJS");'
+
+# =============================================================================
+# Rust (latest stable)
+# =============================================================================
+ENV RUSTUP_HOME=/usr/local/rustup
+ENV CARGO_HOME=/usr/local/cargo
+ENV PATH=/usr/local/cargo/bin:$PATH
+COPY --from=rust ${RUSTUP_HOME} ${RUSTUP_HOME}
+COPY --from=rust ${CARGO_HOME} ${CARGO_HOME}
+
+RUN cargo install evcxr_jupyter && \
     evcxr_jupyter --install
 
-# Node.js/TypeScript
-RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && \
-    apt-get install -y nodejs && \
+# =============================================================================
+# Node.js/TypeScript (latest LTS)
+# =============================================================================
+COPY --from=node /usr/local/bin/node /usr/local/bin/node
+COPY --from=node /usr/local/lib/node_modules /usr/local/lib/node_modules
+RUN ln -s /usr/local/lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm && \
+    ln -s /usr/local/lib/node_modules/npm/bin/npx-cli.js /usr/local/bin/npx && \
     npm install -g typescript tslab && \
-    tslab install --sys-prefix && \
-    rm -rf /var/lib/apt/lists/*
+    tslab install --sys-prefix
+
+# =============================================================================
+# R (latest stable)
+# =============================================================================
+RUN apt-key adv --keyserver keyserver.ubuntu.com --recv-keys E298A3A825C0D65DFD57CBB651716619E084DAB9 && \
+    echo "deb https://cloud.r-project.org/bin/linux/debian bullseye-cran40/" >> /etc/apt/sources.list && \
+    apt-get update && \
+    apt-get install -y r-base r-base-dev && \
+    rm -rf /var/lib/apt/lists/* && \
+    R -e "install.packages('IRkernel', repos='https://cloud.r-project.org')" && \
+    R -e "IRkernel::installspec(sys_prefix = TRUE)"
+
+# =============================================================================
+# C# Versions (.NET 7, .NET 8, .NET 9 beta)
+# =============================================================================
+
+# Install .NET SDK dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libc6 libgcc1 libgssapi-krb5-2 libicu67 libssl1.1 libstdc++6 zlib1g \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install .NET versions
+RUN cd /tmp && \
+    wget -q https://dotnet.microsoft.com/download/dotnet/scripts/v1/dotnet-install.sh && \
+    chmod +x dotnet-install.sh && \
+    # .NET 7
+    ./dotnet-install.sh --channel 7.0 --install-dir /opt/dotnet7 && \
+    # .NET 8 LTS
+    ./dotnet-install.sh --channel 8.0 --install-dir /opt/dotnet8 && \
+    # .NET 9 Preview
+    ./dotnet-install.sh --channel 9.0 --quality preview --install-dir /opt/dotnet9 && \
+    rm dotnet-install.sh
+
+# Install .NET Interactive
+RUN export PATH=/opt/dotnet8/bin:$PATH && \
+    dotnet tool install -g Microsoft.dotnet-interactive && \
+    export PATH=/root/.dotnet/tools:$PATH && \
+    # Install base kernel
+    dotnet interactive jupyter install && \
+    # Copy kernels for each version
+    cp -r /usr/local/share/jupyter/kernels/.net-csharp /usr/local/share/jupyter/kernels/dotnet7-csharp && \
+    cp -r /usr/local/share/jupyter/kernels/.net-csharp /usr/local/share/jupyter/kernels/dotnet8-csharp && \
+    cp -r /usr/local/share/jupyter/kernels/.net-csharp /usr/local/share/jupyter/kernels/dotnet9-csharp && \
+    # Update kernel specifications
+    sed -i 's|"dotnet-interactive"|"/opt/dotnet7/bin/dotnet"|g; s/"display_name": ".*"/"display_name": "C# (.NET 7)"/' \
+    /usr/local/share/jupyter/kernels/dotnet7-csharp/kernel.json && \
+    sed -i 's|"dotnet-interactive"|"/opt/dotnet8/bin/dotnet"|g; s/"display_name": ".*"/"display_name": "C# (.NET 8 LTS)"/' \
+    /usr/local/share/jupyter/kernels/dotnet8-csharp/kernel.json && \
+    sed -i 's|"dotnet-interactive"|"/opt/dotnet9/bin/dotnet"|g; s/"display_name": ".*"/"display_name": "C# (.NET 9 Preview)"/' \
+    /usr/local/share/jupyter/kernels/dotnet9-csharp/kernel.json
+
+# =============================================================================
+# Additional Language Kernels
+# =============================================================================
 
 # Kotlin
-RUN mamba install -y -c jetbrains kotlin-jupyter-kernel && \
-    mamba clean -a -y
+RUN /opt/miniconda/bin/conda install -y -c jetbrains kotlin-jupyter-kernel && \
+    /opt/miniconda/bin/conda clean -a -y && \
+    # Copy kernel to standard location
+    cp -r /opt/miniconda/share/jupyter/kernels/kotlin /usr/local/share/jupyter/kernels/
 
 # Scala (Almond kernel)
-RUN curl -Lo coursier https://git.io/coursier-cli && \
+RUN export JAVA_HOME=/opt/java/jdk-17 && \
+    export PATH=$JAVA_HOME/bin:$PATH && \
+    curl -Lo coursier https://git.io/coursier-cli && \
     chmod +x coursier && \
     ./coursier launch --fork almond -- --install && \
     rm coursier
@@ -286,38 +289,29 @@ RUN pip install sparqlkernel && \
     python -m sparqlkernel.install --sys-prefix
 
 # =============================================================================
-# Final production stage
+# Final Configuration
 # =============================================================================
-FROM other-languages AS final
-LABEL maintainer="Jupyter Multi-Language Environment"
-LABEL description="Comprehensive Jupyter Lab with multiple programming languages"
-LABEL version="1.0.0"
 
 # Create directories
 RUN mkdir -p /notebooks /config
 
-# Copy configuration files
+# Copy configuration files and update script
 COPY config/jupyter_notebook_config.py /config/
 COPY config/matplotlibrc /config/
+COPY update-languages.sh /usr/local/bin/update-languages.sh
+RUN chmod +x /usr/local/bin/update-languages.sh
 
 # Environment variables
 ENV JUPYTER_CONFIG_DIR=/config
 ENV JUPYTER_DATA_DIR=/root/.local/share/jupyter
 ENV NOTEBOOK_DIR=/notebooks
 ENV MPLCONFIGDIR=/config
-ENV PATH=/opt/go/bin:/root/.cargo/bin:/opt/julia-${JULIA_VERSION}/bin:$PATH
 
-# Final cleanup
-RUN apt-get autoremove -y && \
-    apt-get clean && \
-    rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* && \
-    conda clean -a -y
-
-# Expose Jupyter port
-EXPOSE 8888
+# Expose port 7654
+EXPOSE 7654
 
 # Set working directory
 WORKDIR /notebooks
 
 # Start JupyterLab
-CMD ["jupyter", "lab", "--ip=0.0.0.0", "--port=8888", "--no-browser", "--allow-root", "--notebook-dir=/notebooks"]
+CMD ["jupyter", "lab", "--ip=0.0.0.0", "--port=7654", "--no-browser", "--allow-root", "--notebook-dir=/notebooks", "--config=/config/jupyter_notebook_config.py"]

@@ -1,20 +1,21 @@
-version: "3.8"
-
 services:
   jupyter:
-    build:
-      context: .
-      dockerfile: Dockerfile
-      args:
-        - GOLANG_VERSION=1.21.5
-        - JULIA_VERSION=1.10.0
-        - RUST_VERSION=1.75.0
-        - NODE_VERSION=20.10.0
-    image: jupyter-multilang:latest
+    image: jupyter-langs:latest
     container_name: jupyter-multilang
     hostname: jupyter
+    command:
+      [
+        "jupyter",
+        "lab",
+        "--ip=0.0.0.0",
+        "--port=7654",
+        "--no-browser",
+        "--allow-root",
+        "--notebook-dir=/notebooks",
+        "--config=/config/jupyter_notebook_config.py",
+      ]
     ports:
-      - "8888:8888"
+      - "7654:7654"
     volumes:
       - ./notebooks:/notebooks
       - ./config:/config
@@ -27,7 +28,7 @@ services:
       - NOTEBOOK_DIR=/notebooks
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8888/api"]
+      test: ["CMD", "curl", "-f", "http://localhost:7654/api"]
       interval: 30s
       timeout: 10s
       retries: 3

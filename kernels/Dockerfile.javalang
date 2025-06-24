@@ -1,0 +1,80 @@
+# Java Kernels for JupyterLab (Java 11, Java 17, Java 24 beta)
+FROM openjdk:11-jdk-bullseye as java11
+FROM openjdk:17-jdk-bullseye as java17
+
+FROM python:3.13-slim-bullseye
+
+# Install dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    wget \
+    unzip \
+    tar \
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+# =============================================================================
+# Copy Java installations from multi-stage builds
+# =============================================================================
+COPY --from=java11 /usr/local/openjdk-11 /opt/java/jdk-11
+COPY --from=java17 /usr/local/openjdk-17 /opt/java/jdk-17
+
+# =============================================================================
+# Java 24 EA (Early Access/beta)
+# =============================================================================
+RUN cd /opt/java && \
+    wget -q https://download.java.net/java/early_access/jdk24/latest/GPL/openjdk-24-ea_linux-x64_bin.tar.gz && \
+    tar xzf openjdk-24-ea_linux-x64_bin.tar.gz && \
+    rm openjdk-24-ea_linux-x64_bin.tar.gz && \
+    mv jdk-24* jdk-24 || echo "Java 24 EA download may have failed"
+
+# =============================================================================
+# Install IJava kernel
+# =============================================================================
+RUN cd /tmp && \
+    wget -q https://github.com/SpencerPark/IJava/releases/download/v1.3.0/ijava-1.3.0.zip && \
+    unzip -q ijava-1.3.0.zip
+
+# =============================================================================
+# Install kernel for Java 11
+# =============================================================================
+ENV JAVA_HOME=/opt/java/jdk-11
+RUN cd /tmp && \
+    python install.py --sys-prefix && \
+    mv /usr/local/share/jupyter/kernels/java /usr/local/share/jupyter/kernels/java11 && \
+    sed -i 's/"display_name": "Java"/"display_name": "Java 11"/' /usr/local/share/jupyter/kernels/java11/kernel.json && \
+    sed -i "s|\"java\"|\"${JAVA_HOME}/bin/java\"|g" /usr/local/share/jupyter/kernels/java11/kernel.json
+
+# =============================================================================
+# Install kernel for Java 17
+# =============================================================================
+ENV JAVA_HOME=/opt/java/jdk-17
+RUN cd /tmp && \
+    python install.py --sys-prefix && \
+    mv /usr/local/share/jupyter/kernels/java /usr/local/share/jupyter/kernels/java17 && \
+    sed -i 's/"display_name": "Java"/"display_name": "Java 17"/' /usr/local/share/jupyter/kernels/java17/kernel.json && \
+    sed -i "s|\"java\"|\"${JAVA_HOME}/bin/java\"|g" /usr/local/share/jupyter/kernels/java17/kernel.json
+
+# =============================================================================
+# Install kernel for Java 24 (if available)
+# =============================================================================
+RUN if [ -d /opt/java/jdk-24 ]; then \
+    export JAVA_HOME=/opt/java/jdk-24 && \
+    cd /tmp && \
+    python install.py --sys-prefix && \
+    mv /usr/local/share/jupyter/kernels/java /usr/local/share/jupyter/kernels/java24 && \
+    sed -i 's/"display_name": "Java"/"display_name": "Java 24 (beta)"/' /usr/local/share/jupyter/kernels/java24/kernel.json && \
+    sed -i "s|\"java\"|\"${JAVA_HOME}/bin/java\"|g" /usr/local/share/jupyter/kernels/java24/kernel.json; \
+    fi
+
+# Clean up installation files
+RUN rm -rf /tmp/ijava*
+
+# =============================================================================
+# Copy all kernel specs and Java installations to output location
+# =============================================================================
+RUN mkdir -p /kernel-output && \
+    cp -r /usr/local/share/jupyter/kernels/java11 /kernel-output/ && \
+    cp -r /usr/local/share/jupyter/kernels/java17 /kernel-output/ && \
+    (cp -r /usr/local/share/jupyter/kernels/java24 /kernel-output/ 2>/dev/null || true) && \
+    mkdir -p /kernel-output/java && \
+    cp -r /opt/java/* /kernel-output/java/

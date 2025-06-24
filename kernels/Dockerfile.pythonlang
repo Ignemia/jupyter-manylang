@@ -1,0 +1,68 @@
+# Python Kernels for JupyterLab (Python 2.7, 3.13, 3.14 beta)
+FROM python:3.13-slim-bullseye
+
+# Install build dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    wget \
+    curl \
+    ca-certificates \
+    libssl-dev \
+    libffi-dev \
+    libbz2-dev \
+    libreadline-dev \
+    libsqlite3-dev \
+    libncursesw5-dev \
+    xz-utils \
+    tk-dev \
+    libxml2-dev \
+    libxmlsec1-dev \
+    liblzma-dev \
+    zlib1g-dev \
+    # Python 2.7 dependencies
+    python2.7 \
+    python2.7-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# =============================================================================
+# Python 3.13 (already installed as base image)
+# =============================================================================
+RUN python -m pip install --upgrade pip ipykernel && \
+    python -m ipykernel install --name python3.13 --display-name "Python 3.13"
+
+# =============================================================================
+# Python 2.7
+# =============================================================================
+RUN curl https://bootstrap.pypa.io/pip/2.7/get-pip.py -o get-pip.py && \
+    python2.7 get-pip.py && \
+    rm get-pip.py && \
+    python2.7 -m pip install ipykernel && \
+    python2.7 -m ipykernel install --name python2.7 --display-name "Python 2.7"
+
+# =============================================================================
+# Python 3.14 beta (build from source)
+# =============================================================================
+RUN cd /tmp && \
+    wget -q https://www.python.org/ftp/python/3.14.0/Python-3.14.0a3.tgz && \
+    tar xzf Python-3.14.0a3.tgz && \
+    cd Python-3.14.0a3 && \
+    ./configure --enable-optimizations --prefix=/opt/python3.14 && \
+    make -j$(nproc) && \
+    make install && \
+    cd / && rm -rf /tmp/Python-* && \
+    /opt/python3.14/bin/python3 -m pip install --upgrade pip ipykernel && \
+    /opt/python3.14/bin/python3 -m ipykernel install --name python3.14 --display-name "Python 3.14 (beta)"
+
+# =============================================================================
+# Copy all kernel specs to output location
+# =============================================================================
+RUN mkdir -p /kernel-output && \
+    cp -r /usr/local/share/jupyter/kernels/python2.7 /kernel-output/ && \
+    cp -r /usr/local/share/jupyter/kernels/python3.13 /kernel-output/ && \
+    cp -r /usr/local/share/jupyter/kernels/python3.14 /kernel-output/ && \
+    # Copy Python 3.14 installation for runtime
+    mkdir -p /kernel-output/python && \
+    cp -r /opt/python3.14 /kernel-output/python/
+
+# Update kernel.json files to use absolute paths where needed
+RUN sed -i 's|"python3.14"|"/opt/python3.14/bin/python3"|g' /kernel-output/python3.14/kernel.json

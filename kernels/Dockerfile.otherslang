@@ -1,0 +1,92 @@
+# Other Language Kernels for JupyterLab (Kotlin, Scala, Bash, SPARQL)
+FROM python:3.13-slim-bullseye
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    wget \
+    curl \
+    ca-certificates \
+    git \
+    build-essential \
+    # For Scala/Almond
+    openjdk-17-jdk-headless \
+    # For conda (Kotlin)
+    bzip2 \
+    # Additional dependencies
+    libzmq3-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Set Java environment for Scala
+ENV JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
+ENV PATH=$JAVA_HOME/bin:$PATH
+
+# =============================================================================
+# Install Miniconda for Kotlin kernel
+# =============================================================================
+RUN wget -q https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -O /tmp/miniconda.sh && \
+    bash /tmp/miniconda.sh -b -p /opt/miniconda && \
+    rm /tmp/miniconda.sh
+
+# Add conda to PATH
+ENV PATH=/opt/miniconda/bin:$PATH
+
+# Install Kotlin kernel via conda
+RUN conda install -y -c jetbrains kotlin-jupyter-kernel && \
+    conda clean -a -y
+
+# =============================================================================
+# Install Scala kernel (Almond)
+# =============================================================================
+RUN curl -Lo coursier https://git.io/coursier-cli && \
+    chmod +x coursier && \
+    ./coursier launch --fork almond -- --install && \
+    rm coursier
+
+# =============================================================================
+# Install Python-based kernels
+# =============================================================================
+RUN pip install --no-cache-dir bash_kernel sparqlkernel
+
+# Install Bash kernel spec
+RUN python -m bash_kernel.install --sys-prefix
+
+# Install SPARQL kernel spec
+RUN python -m sparqlkernel.install --sys-prefix
+
+# =============================================================================
+# Copy all kernel specs to output location
+# =============================================================================
+RUN mkdir -p /kernel-output && \
+    # Kotlin kernel
+    find /opt/miniconda/share/jupyter/kernels -name "kotlin" -type d -exec cp -r {} /kernel-output/ \; 2>/dev/null || \
+    find /usr/local/share/jupyter/kernels -name "kotlin" -type d -exec cp -r {} /kernel-output/ \; 2>/dev/null || \
+    find /usr/share/jupyter/kernels -name "kotlin" -type d -exec cp -r {} /kernel-output/ \; 2>/dev/null || true && \
+    # Scala kernel (Almond)
+    find /usr/local/share/jupyter/kernels -name "scala*" -type d -exec cp -r {} /kernel-output/ \; 2>/dev/null || \
+    find /usr/share/jupyter/kernels -name "scala*" -type d -exec cp -r {} /kernel-output/ \; 2>/dev/null || \
+    find /root/.local/share/jupyter/kernels -name "scala*" -type d -exec cp -r {} /kernel-output/ \; 2>/dev/null || true && \
+    # Bash kernel
+    find /usr/local/share/jupyter/kernels -name "bash" -type d -exec cp -r {} /kernel-output/ \; 2>/dev/null || \
+    find /usr/share/jupyter/kernels -name "bash" -type d -exec cp -r {} /kernel-output/ \; 2>/dev/null || \
+    find /root/.local/share/jupyter/kernels -name "bash" -type d -exec cp -r {} /kernel-output/ \; 2>/dev/null || true && \
+    # SPARQL kernel
+    find /usr/local/share/jupyter/kernels -name "sparql" -type d -exec cp -r {} /kernel-output/ \; 2>/dev/null || \
+    find /usr/share/jupyter/kernels -name "sparql" -type d -exec cp -r {} /kernel-output/ \; 2>/dev/null || \
+    find /root/.local/share/jupyter/kernels -name "sparql" -type d -exec cp -r {} /kernel-output/ \; 2>/dev/null || true
+
+# =============================================================================
+# Copy required binaries and libraries
+# =============================================================================
+RUN mkdir -p /kernel-output/bin && \
+    # Copy Kotlin dependencies from conda
+    mkdir -p /kernel-output/miniconda && \
+    cp -r /opt/miniconda /kernel-output/ && \
+    # Copy Java for Scala
+    mkdir -p /kernel-output/java && \
+    cp -r $JAVA_HOME /kernel-output/java/ && \
+    # Copy Almond/Coursier cache for Scala
+    mkdir -p /kernel-output/coursier-cache && \
+    (cp -r /root/.cache/coursier /kernel-output/coursier-cache/ 2>/dev/null || true) && \
+    # Copy ivy cache for Scala
+    mkdir -p /kernel-output/ivy-cache && \
+    (cp -r /root/.ivy2 /kernel-output/ivy-cache/ 2>/dev/null || true)

@@ -1,50 +1,53 @@
-# Jupyter Multi-Language Environment
+# JupyterLab Multi-Language Docker Environment
 
-A comprehensive Jupyter Lab environment with support for multiple programming languages and their various versions, all packaged in a single Docker container.
+**IMPORTANT: This is a VERSION-AGNOSTIC JupyterLab environment where ALL languages use their LATEST STABLE versions, EXCEPT for the specifically listed versions below.**
 
-## 🚀 Features
+## 🎯 Project Philosophy
 
-- **JupyterLab 4.0** with modern interface and extensions
-- **Multiple language kernels** in a single environment
-- **Zero-configuration setup** - just run and start coding
-- **Persistent notebooks** via volume mounting
-- **Customizable configuration** through environment variables
-- **Optimized Docker build** with minimal image size
-- **Health monitoring** and automatic restart capabilities
+This Docker image provides a JupyterLab environment with multiple programming language kernels. The core principle is:
+- **ALL languages use their LATEST STABLE versions**
+- **EXCEPT for C++, Java, Python, and C# which have SPECIFIC version requirements**
+- **Latest beta versions and all other languages are updated on container start**
 
-## 📚 Supported Languages
+## 📌 Version Specifications
 
-### Python
-- Python 2.7 (legacy support)
-- Python 3.7
-- Python 3.11 (default)
-- Python 3.12
-- Python 3.13
-- Python 3.14 (beta)
+### FIXED VERSIONS (Do NOT change these)
 
-### C/C++
-- C++11/14/17 (via xeus-cling)
-- C++23
-- C++26 (experimental)
+#### C++ Versions
+- **C++11** (GCC with -std=c++11)
+- **C++14** (GCC with -std=c++14)
+- **C++17** (GCC with -std=c++17)
+- **C++23** (GCC with -std=c++23)
+- **C++26** (Latest beta, updated on container start)
 
-### Java
-- Java 14
-- Java 17 (LTS)
-- Java 21 (LTS)
-- Java 24 (Early Access)
+#### Java Versions
+- **Java 11** (OpenJDK 11)
+- **Java 17** (OpenJDK 17)
+- **Java 24** (Latest beta, updated on container start)
 
-### Other Languages
-- **R** (4.1+) with tidyverse, ggplot2, and plotly
-- **Julia** (1.10.0) with DataFrames and plotting libraries
-- **Go** (1.21.5) via Gophernotes
-- **Rust** (1.75.0) via EvCxR
-- **Node.js/TypeScript** (20.10.0) via tslab
-- **Kotlin** via kotlin-jupyter-kernel
-- **Scala** via Almond kernel
-- **Bash** for shell scripting
-- **SPARQL** for RDF queries
+#### Python Versions
+- **Python 2.7** (Legacy support)
+- **Python 3.13** (Current stable)
+- **Python 3.14** (Latest beta, updated on container start)
 
-## 🛠️ Quick Start
+#### C# Versions
+- **C# (.NET 6)** (LTS)
+- **C# (.NET 8)** (LTS)
+- **C# (.NET 9)** (Latest preview, updated on container start)
+
+### LATEST VERSIONS (Updated on container start)
+All other languages use their **LATEST STABLE** versions:
+- **Go** (latest stable)
+- **Rust** (latest stable)
+- **Julia** (latest stable)
+- **R** (latest stable)
+- **TypeScript/JavaScript** (latest Node.js LTS)
+- **Kotlin** (latest stable)
+- **Scala** (latest stable)
+- **Bash** (system default)
+- **SPARQL** (latest stable)
+
+## 🚀 Quick Start
 
 ### Prerequisites
 - Docker 20.10+
@@ -52,154 +55,139 @@ A comprehensive Jupyter Lab environment with support for multiple programming la
 - At least 8GB RAM (16GB recommended)
 - 20GB free disk space
 
-### Installation
+### Installation & Usage
 
 1. Clone the repository:
 ```bash
-git clone https://github.com/yourusername/jupyter-multilang.git
-cd jupyter-multilang
+git clone <repository-url>
+cd jupyter
 ```
 
-2. Build and start the container:
+2. Build the Docker image:
+```bash
+# Make the build script executable
+chmod +x build-composite.sh
+
+# Run the build script
+./build-composite.sh
+```
+
+3. Start the container:
 ```bash
 docker compose up -d
 ```
 
-3. Access JupyterLab:
-   - Open http://localhost:8888 in your browser
-   - No token/password required by default (configurable)
+4. Access JupyterLab at: **http://localhost:7654**
+   
+   **NOTE: Port 7654 is used, NOT 8888**
 
-### Basic Commands
-
+5. (Optional) Check available kernels:
 ```bash
-# Start the environment
-docker compose up -d
-
-# Stop the environment
-docker compose down
-
-# View logs
-docker compose logs -f
-
-# Rebuild after changes
-docker compose build --no-cache
-
-# Clean up everything (including notebooks)
-docker compose down -v && rm -rf ./notebooks/*
+docker exec jupyter-multilang jupyter kernelspec list
 ```
+
+## 🔧 Architecture
+
+### Docker Structure
+The project uses a multi-stage build approach with individual kernel Dockerfiles:
+1. **Individual Kernel Dockerfiles**: Located in `kernels/` directory (one per language)
+2. **Composite Dockerfile**: `Dockerfile.composite` combines all kernels
+3. **Build Script**: `build-composite.sh` orchestrates the build process
+4. **Multi-stage Build**: Each kernel is built in isolation then combined
+5. **Final Stage**: Assembled JupyterLab environment with all kernels
+
+### Automatic Updates
+The `update-languages.sh` script runs on container start to:
+- Update all version-agnostic languages to their latest stable versions
+- Update C++26 to the latest beta
+- Update Java 24 to the latest beta
+- Update Python 3.14 to the latest beta
+- Update C# (.NET 9) to the latest preview
 
 ## 📁 Project Structure
 
 ```
-jupyter-multilang/
-├── Dockerfile              # Main multi-stage Dockerfile
+jupyter/
+├── Dockerfile.composite    # Main composite Dockerfile
 ├── docker-compose.yml      # Docker Compose configuration
-├── .env                    # Environment variables
-├── config/                 # Configuration files
+├── build-composite.sh      # Build script for all kernels
+├── update-languages.sh     # Auto-update script for latest versions
+├── kernels/                # Individual kernel Dockerfiles
+│   ├── Dockerfile.cpplang      # C++ kernels
+│   ├── Dockerfile.javalang     # Java kernels
+│   ├── Dockerfile.pythonlang   # Python kernels
+│   ├── Dockerfile.csharplang   # C# kernels
+│   └── ...                     # Other language kernels
+├── config/                 # JupyterLab configuration
 │   ├── jupyter_notebook_config.py
 │   └── matplotlibrc
-├── notebooks/              # Your notebook files (persistent)
-├── .gitignore
-├── .dockerignore
-├── README.md              # This file
-└── CHANGELOG.md           # Version history
+├── notebooks/              # Persistent notebook storage
+├── AGENTS.md              # Instructions for AI agents
+├── CONTINUE.md            # Development status and notes
+└── README.md              # This file
 ```
 
 ## ⚙️ Configuration
 
+### Port Configuration
+- **JupyterLab Port**: 7654 (configurable in docker-compose.yml)
+- **Do NOT use port 8888** - reserved for other services
+
 ### Environment Variables
-
-Key configuration options in `.env`:
-
-```env
-# Port configuration
-JUPYTER_PORT=8888
-
-# Security (set a token for production)
-JUPYTER_TOKEN=your-secure-token-here
-
-# Language versions
-GOLANG_VERSION=1.21.5
-JULIA_VERSION=1.10.0
-RUST_VERSION=1.75.0
-NODE_VERSION=20.10.0
-
-# Resource limits
-MEMORY_LIMIT=8g
-CPU_LIMIT=4
+Set in `docker-compose.yml`:
+```yaml
+JUPYTER_PORT: 7654
+JUPYTER_TOKEN: ""  # Set for security in production
 ```
 
-### Custom Configuration
+## 🧪 Testing Language Kernels
 
-1. **Jupyter Configuration**: Edit `config/jupyter_notebook_config.py`
-2. **Matplotlib Settings**: Edit `config/matplotlibrc`
-3. **Environment Variables**: Modify `.env` file
-
-### Disabling Kernels
-
-To disable specific language kernels, set the corresponding variable to 0 in `.env`:
-
-```env
-ENABLE_PYTHON2=0    # Disables Python 2.7
-ENABLE_JAVA=0       # Disables all Java kernels
+After starting the container, verify all kernels:
+```bash
+docker exec jupyter-multilang jupyter kernelspec list
 ```
 
-## 🧪 Testing Kernels
+Expected kernels:
+- Python 2.7, 3.13, 3.14 (beta)
+- C++11, C++14, C++17, C++23, C++26 (beta)
+- Java 11, 17, 24 (beta)
+- C# (.NET 6 LTS), C# (.NET 8 LTS), C# (.NET 9 preview)
+- Go (latest)
+- Rust (latest)
+- Julia (latest)
+- R (latest)
+- TypeScript/JavaScript (latest)
+- Kotlin (latest)
+- Scala (latest)
+- Bash
+- SPARQL
 
-Create a new notebook and test each kernel:
+## 📝 Important Notes
 
-```python
-# Python
-import sys
-print(f"Python {sys.version}")
-
-# Display plots
-import matplotlib.pyplot as plt
-import numpy as np
-x = np.linspace(0, 2*np.pi, 100)
-plt.plot(x, np.sin(x))
-plt.show()
-```
-
-```cpp
-// C++23
-#include <iostream>
-#include <format>
-auto main() -> int {
-    std::cout << std::format("Hello from C++23!\n");
-    return 0;
-}
-```
-
-```java
-// Java
-System.out.println("Java version: " + System.getProperty("java.version"));
-```
+1. **Version Policy**: Do NOT change the specified versions for C++, Java, Python, or C# without explicit approval
+2. **Port Usage**: Always use port 7654, NOT 8888
+3. **Updates**: The update-languages.sh script ensures latest versions for non-specified languages
+4. **Beta Versions**: C++26, Java 24, Python 3.14, and C# (.NET 9) beta/preview versions are automatically updated
 
 ## 🐛 Troubleshooting
 
 ### Container won't start
 ```bash
 # Check logs
-docker compose logs jupyter
+docker compose logs -f
 
-# Verify port availability
-netstat -an | grep 8888
+# Verify port 7654 is available
+netstat -an | grep 7654
 ```
 
-### Kernel connection issues
+### Kernel not found
 ```bash
-# Restart the container
+# Restart container to trigger update script
 docker compose restart
 
-# Check kernel specifications
+# Check installed kernels
 docker exec jupyter-multilang jupyter kernelspec list
 ```
-
-### Out of memory errors
-- Increase Docker memory allocation
-- Set memory limits in `.env`
-- Close unused kernels in JupyterLab
 
 ### Permission issues
 ```bash
@@ -207,78 +195,19 @@ docker exec jupyter-multilang jupyter kernelspec list
 sudo chown -R $(id -u):$(id -g) notebooks/
 ```
 
-## 🚀 Advanced Usage
-
-### Adding Custom Packages
-
-1. **Python packages**: Create a cell in any Python notebook:
-```python
-!pip install package-name
-```
-
-2. **System packages**: Extend the Dockerfile:
-```dockerfile
-RUN apt-get update && apt-get install -y package-name
-```
-
-### Custom Kernel Configuration
-
-Add kernel specifications to `/opt/conda/share/jupyter/kernels/`.
-
-### Running Multiple Instances
-
-```bash
-# Create separate directories
-cp -r jupyter-multilang jupyter-instance2
-cd jupyter-instance2
-
-# Modify port in .env
-sed -i 's/JUPYTER_PORT=8888/JUPYTER_PORT=8889/' .env
-
-# Start second instance
-docker compose up -d
-```
-
-## 📊 Resource Requirements
-
-| Component | Minimum | Recommended |
-|-----------|---------|-------------|
-| RAM | 4GB | 16GB |
-| CPU | 2 cores | 4+ cores |
-| Disk | 15GB | 30GB |
-| Docker | 20.10+ | Latest |
-
 ## 🤝 Contributing
 
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Test thoroughly
-5. Submit a pull request
+When contributing:
+1. **ALWAYS** read this README first
+2. **NEVER** change the specified language versions
+3. **ALWAYS** build with `./build-composite.sh` before testing
+4. **ALWAYS** test with `docker compose up`
+5. **ALWAYS** verify all kernels are working with `docker exec jupyter-multilang jupyter kernelspec list`
 
-### Adding New Languages
+## 📄 License
 
-1. Modify the Dockerfile to install the language runtime
-2. Install the Jupyter kernel for that language
-3. Update documentation
-4. Test the kernel thoroughly
-
-## 📝 License
-
-This project is licensed under the MIT License. See LICENSE file for details.
-
-## 🙏 Acknowledgments
-
-- Jupyter Project for JupyterLab
-- All language communities for their kernel implementations
-- Docker for containerization technology
-
-## 📞 Support
-
-- **Issues**: GitHub Issues for bug reports
-- **Discussions**: GitHub Discussions for questions
-- **Security**: Report vulnerabilities privately
+MIT License - See LICENSE file for details.
 
 ---
 
-**Note**: This environment is intended for development and educational purposes. For production use, ensure proper security measures including authentication tokens and network isolation.
+**Remember**: This is a VERSION-AGNOSTIC environment with SPECIFIC EXCEPTIONS. When in doubt, refer to the version specifications above.

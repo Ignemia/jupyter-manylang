@@ -1,0 +1,36 @@
+# Go Kernel for JupyterLab (latest stable)
+FROM golang:1.23-bullseye
+
+# Install dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    python3 \
+    python3-pip \
+    git \
+    && rm -rf /var/lib/apt/lists/*
+
+# Set Go environment
+ENV GOPATH=/go
+ENV PATH=$GOPATH/bin:/usr/local/go/bin:$PATH
+
+# Install gophernotes kernel
+RUN go install github.com/gopherdata/gophernotes@latest
+
+# Create kernel directory
+RUN mkdir -p /usr/local/share/jupyter/kernels/gophernotes
+
+# Copy kernel files from the installed module
+RUN cd /usr/local/share/jupyter/kernels/gophernotes && \
+    cp "$(go env GOPATH)"/pkg/mod/github.com/gopherdata/gophernotes@*/kernel/* . && \
+    chmod +w kernel.json && \
+    sed "s|gophernotes|$(go env GOPATH)/bin/gophernotes|" < kernel.json.in > kernel.json
+
+# =============================================================================
+# Copy kernel spec and Go installation to output location
+# =============================================================================
+RUN mkdir -p /kernel-output && \
+    cp -r /usr/local/share/jupyter/kernels/gophernotes /kernel-output/ && \
+    mkdir -p /kernel-output/go && \
+    cp -r /usr/local/go /kernel-output/go/ && \
+    mkdir -p /kernel-output/gopath && \
+    cp -r $GOPATH/bin /kernel-output/gopath/ && \
+    cp -r $GOPATH/pkg /kernel-output/gopath/

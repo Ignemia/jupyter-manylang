@@ -1,0 +1,52 @@
+# C++ Kernels for JupyterLab (C++11, C++14, C++17, C++23, C++26 beta)
+FROM python:3.13-slim-bullseye
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    gcc \
+    g++ \
+    cmake \
+    pkg-config \
+    wget \
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Miniconda for xeus-cling
+RUN wget -q https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -O /tmp/miniconda.sh && \
+    bash /tmp/miniconda.sh -b -p /opt/miniconda && \
+    rm /tmp/miniconda.sh
+
+# Add conda to PATH
+ENV PATH=/opt/miniconda/bin:$PATH
+
+# Install xeus-cling from conda-forge
+RUN conda install -y -c conda-forge xeus-cling && \
+    conda clean -a -y
+
+# Create kernel specifications for different C++ standards
+RUN mkdir -p /kernel-output && \
+    # C++11
+    mkdir -p /kernel-output/cpp11 && \
+    echo '{"display_name": "C++11", "argv": ["/opt/miniconda/bin/xcpp", "-std=c++11", "-f", "{connection_file}"], "language": "c++"}' > \
+    /kernel-output/cpp11/kernel.json && \
+    # C++14
+    mkdir -p /kernel-output/cpp14 && \
+    echo '{"display_name": "C++14", "argv": ["/opt/miniconda/bin/xcpp", "-std=c++14", "-f", "{connection_file}"], "language": "c++"}' > \
+    /kernel-output/cpp14/kernel.json && \
+    # C++17
+    mkdir -p /kernel-output/cpp17 && \
+    echo '{"display_name": "C++17", "argv": ["/opt/miniconda/bin/xcpp", "-std=c++17", "-f", "{connection_file}"], "language": "c++"}' > \
+    /kernel-output/cpp17/kernel.json && \
+    # C++23
+    mkdir -p /kernel-output/cpp23 && \
+    echo '{"display_name": "C++23", "argv": ["/opt/miniconda/bin/xcpp", "-std=c++23", "-f", "{connection_file}"], "language": "c++"}' > \
+    /kernel-output/cpp23/kernel.json && \
+    # C++26 (beta)
+    mkdir -p /kernel-output/cpp26 && \
+    echo '{"display_name": "C++26 (beta)", "argv": ["/opt/miniconda/bin/xcpp", "-std=c++2c", "-f", "{connection_file}"], "language": "c++"}' > \
+    /kernel-output/cpp26/kernel.json
+
+# Copy miniconda installation for runtime
+RUN mkdir -p /kernel-output/miniconda && \
+    cp -r /opt/miniconda /kernel-output/

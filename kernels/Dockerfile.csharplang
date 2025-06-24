@@ -1,0 +1,107 @@
+# C# Kernels for JupyterLab (.NET 7, .NET 8 LTS, .NET 9 Preview)
+FROM python:3.13-slim-bullseye
+
+# Install dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    wget \
+    ca-certificates \
+    curl \
+    git \
+    libc6 \
+    libgcc1 \
+    libgssapi-krb5-2 \
+    libicu67 \
+    libssl1.1 \
+    libstdc++6 \
+    zlib1g \
+    && rm -rf /var/lib/apt/lists/*
+
+# =============================================================================
+# Download and install .NET SDKs
+# =============================================================================
+RUN wget -q https://dotnet.microsoft.com/download/dotnet/scripts/v1/dotnet-install.sh && \
+    chmod +x dotnet-install.sh
+
+# Install .NET 7
+RUN ./dotnet-install.sh --channel 7.0 --install-dir /opt/dotnet7
+
+# Install .NET 8 LTS
+RUN ./dotnet-install.sh --channel 8.0 --install-dir /opt/dotnet8
+
+# Install .NET 9 Preview
+RUN ./dotnet-install.sh --channel 9.0 --quality preview --install-dir /opt/dotnet9
+
+# Clean up install script
+RUN rm dotnet-install.sh
+
+# =============================================================================
+# Install .NET Interactive using .NET 8 (LTS)
+# =============================================================================
+ENV PATH=/opt/dotnet8/bin:$PATH
+RUN dotnet tool install -g Microsoft.dotnet-interactive
+ENV PATH=/root/.dotnet/tools:$PATH
+
+# Install base kernel
+RUN dotnet interactive jupyter install
+
+# =============================================================================
+# Create kernel specifications for each .NET version
+# =============================================================================
+RUN mkdir -p /kernel-output && \
+    # Copy base kernel specs for modification
+    cp -r /usr/local/share/jupyter/kernels/.net-csharp /kernel-output/dotnet7-csharp && \
+    cp -r /usr/local/share/jupyter/kernels/.net-csharp /kernel-output/dotnet8-csharp && \
+    cp -r /usr/local/share/jupyter/kernels/.net-csharp /kernel-output/dotnet9-csharp && \
+    cp -r /usr/local/share/jupyter/kernels/.net-fsharp /kernel-output/dotnet7-fsharp && \
+    cp -r /usr/local/share/jupyter/kernels/.net-fsharp /kernel-output/dotnet8-fsharp && \
+    cp -r /usr/local/share/jupyter/kernels/.net-fsharp /kernel-output/dotnet9-fsharp
+
+# =============================================================================
+# Update kernel.json files for each version
+# =============================================================================
+# .NET 7 C#
+RUN sed -i 's|"dotnet-interactive"|"/opt/dotnet7/bin/dotnet"|g; s/"display_name": ".*"/"display_name": "C# (.NET 7)"/' \
+    /kernel-output/dotnet7-csharp/kernel.json && \
+    sed -i 's|"--default-kernel", "csharp"|"--default-kernel", "csharp", "--dotnet-path", "/opt/dotnet7/bin/dotnet"|g' \
+    /kernel-output/dotnet7-csharp/kernel.json
+
+# .NET 8 LTS C#
+RUN sed -i 's|"dotnet-interactive"|"/opt/dotnet8/bin/dotnet"|g; s/"display_name": ".*"/"display_name": "C# (.NET 8 LTS)"/' \
+    /kernel-output/dotnet8-csharp/kernel.json && \
+    sed -i 's|"--default-kernel", "csharp"|"--default-kernel", "csharp", "--dotnet-path", "/opt/dotnet8/bin/dotnet"|g' \
+    /kernel-output/dotnet8-csharp/kernel.json
+
+# .NET 9 Preview C#
+RUN sed -i 's|"dotnet-interactive"|"/opt/dotnet9/bin/dotnet"|g; s/"display_name": ".*"/"display_name": "C# (.NET 9 Preview)"/' \
+    /kernel-output/dotnet9-csharp/kernel.json && \
+    sed -i 's|"--default-kernel", "csharp"|"--default-kernel", "csharp", "--dotnet-path", "/opt/dotnet9/bin/dotnet"|g' \
+    /kernel-output/dotnet9-csharp/kernel.json
+
+# .NET 7 F#
+RUN sed -i 's|"dotnet-interactive"|"/opt/dotnet7/bin/dotnet"|g; s/"display_name": ".*"/"display_name": "F# (.NET 7)"/' \
+    /kernel-output/dotnet7-fsharp/kernel.json && \
+    sed -i 's|"--default-kernel", "fsharp"|"--default-kernel", "fsharp", "--dotnet-path", "/opt/dotnet7/bin/dotnet"|g' \
+    /kernel-output/dotnet7-fsharp/kernel.json
+
+# .NET 8 LTS F#
+RUN sed -i 's|"dotnet-interactive"|"/opt/dotnet8/bin/dotnet"|g; s/"display_name": ".*"/"display_name": "F# (.NET 8 LTS)"/' \
+    /kernel-output/dotnet8-fsharp/kernel.json && \
+    sed -i 's|"--default-kernel", "fsharp"|"--default-kernel", "fsharp", "--dotnet-path", "/opt/dotnet8/bin/dotnet"|g' \
+    /kernel-output/dotnet8-fsharp/kernel.json
+
+# .NET 9 Preview F#
+RUN sed -i 's|"dotnet-interactive"|"/opt/dotnet9/bin/dotnet"|g; s/"display_name": ".*"/"display_name": "F# (.NET 9 Preview)"/' \
+    /kernel-output/dotnet9-fsharp/kernel.json && \
+    sed -i 's|"--default-kernel", "fsharp"|"--default-kernel", "fsharp", "--dotnet-path", "/opt/dotnet9/bin/dotnet"|g' \
+    /kernel-output/dotnet9-fsharp/kernel.json
+
+# =============================================================================
+# Copy .NET installations and tools to output location
+# =============================================================================
+RUN mkdir -p /kernel-output/dotnet && \
+    cp -r /opt/dotnet7 /kernel-output/dotnet/ && \
+    cp -r /opt/dotnet8 /kernel-output/dotnet/ && \
+    cp -r /opt/dotnet9 /kernel-output/dotnet/ && \
+    # Copy dotnet-interactive tool
+    mkdir -p /kernel-output/dotnet-tools && \
+    cp -r /root/.dotnet /kernel-output/dotnet-tools/

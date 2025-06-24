@@ -1,0 +1,41 @@
+# R Kernel for JupyterLab (latest stable)
+FROM r-base:4.3.2
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    python3 \
+    python3-pip \
+    libcurl4-openssl-dev \
+    libssl-dev \
+    libxml2-dev \
+    libgit2-dev \
+    libzmq3-dev \
+    libczmq-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install IRkernel and common R packages
+RUN R -e "install.packages(c('IRkernel', 'ggplot2', 'dplyr', 'tidyr', 'readr', 'tibble', 'purrr', 'forcats', 'stringr', 'lubridate'), repos='https://cloud.r-project.org')"
+
+# Install additional useful packages
+RUN R -e "install.packages(c('knitr', 'rmarkdown', 'shiny', 'plotly', 'DT', 'caret', 'randomForest'), repos='https://cloud.r-project.org')"
+
+# Install the kernel spec
+RUN R -e "IRkernel::installspec(sys_prefix = TRUE)"
+
+# =============================================================================
+# Copy kernel spec and R installation to output location
+# =============================================================================
+RUN mkdir -p /kernel-output && \
+    # Find and copy R kernel (it could be in different locations)
+    find /usr/local/share/jupyter/kernels -name "ir" -type d -exec cp -r {} /kernel-output/ \; 2>/dev/null || \
+    find /usr/share/jupyter/kernels -name "ir" -type d -exec cp -r {} /kernel-output/ \; 2>/dev/null || \
+    find /root/.local/share/jupyter/kernels -name "ir" -type d -exec cp -r {} /kernel-output/ \; 2>/dev/null || true
+
+# Copy R installation to output location
+RUN mkdir -p /kernel-output/R && \
+    cp -r /usr/lib/R /kernel-output/R/lib && \
+    (cp -r /usr/local/lib/R /kernel-output/R/local 2>/dev/null || true) && \
+    # Copy R binaries
+    mkdir -p /kernel-output/R/bin && \
+    cp /usr/bin/R /kernel-output/R/bin/ && \
+    cp /usr/bin/Rscript /kernel-output/R/bin/
