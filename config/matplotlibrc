@@ -1,0 +1,57 @@
+# Matplotlib configuration file for Jupyter environment
+
+# Backend
+backend: module://matplotlib_inline.backend_inline
+
+# Figure properties
+figure.figsize: 8, 6
+figure.dpi: 100
+figure.facecolor: white
+figure.edgecolor: white
+figure.autolayout: True
+
+# Font properties
+font.size: 10
+font.family: sans-serif
+font.sans-serif: DejaVu Sans, Liberation Sans, Arial, Helvetica, sans-serif
+
+# Axes properties
+axes.labelsize: medium
+axes.titlesize: large
+axes.grid: True
+axes.grid.alpha: 0.3
+axes.facecolor: white
+axes.edgecolor: black
+axes.linewidth: 0.8
+axes.prop_cycle: cycler('color', ['1f77b4', 'ff7f0e', '2ca02c', 'd62728', '9467bd', '8c564b', 'e377c2', '7f7f7f', 'bcbd22', '17becf'])
+
+# Grid properties
+grid.color: gray
+grid.linestyle: -
+grid.linewidth: 0.5
+grid.alpha: 0.3
+
+# Legend properties
+legend.fontsize: medium
+legend.frameon: True
+legend.framealpha: 0.8
+legend.fancybox: True
+
+# Figure subplot properties
+figure.subplot.left: 0.125
+figure.subplot.right: 0.9
+figure.subplot.bottom: 0.11
+figure.subplot.top: 0.88
+figure.subplot.wspace: 0.2
+figure.subplot.hspace: 0.2
+
+# Save figure properties
+savefig.dpi: 100
+savefig.facecolor: white
+savefig.edgecolor: white
+savefig.format: png
+savefig.bbox: tight
+savefig.pad_inches: 0.1
+
+# Interactive mode
+interactive: True
