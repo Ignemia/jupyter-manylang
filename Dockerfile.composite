@@ -114,7 +114,7 @@ RUN cd /tmp && \
 FROM python:3.13-slim-bullseye AS csharp-kernels
 # Install dependencies for .NET
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    curl wget ca-certificates && rm -rf /var/lib/apt/lists/*
+    curl wget ca-certificates libicu-dev && rm -rf /var/lib/apt/lists/*
 
 # Install .NET SDKs
 RUN curl -sSL https://dot.net/v1/dotnet-install.sh -o dotnet-install.sh && \
@@ -187,22 +187,18 @@ ENV RUSTUP_HOME=/usr/local/rustup
 ENV CARGO_HOME=/usr/local/cargo
 ENV PATH=/usr/local/cargo/bin:$PATH
 
-# Try to install an older version of evcxr_jupyter that might work
-RUN cargo install evcxr_jupyter --version 0.14.2 || \
-    (echo "Falling back to placeholder kernel" && \
-     mkdir -p /kernels/rust && \
-     echo '{"display_name": "Rust", "argv": ["echo", "Rust kernel not available - evcxr_jupyter installation failed"], "language": "rust"}' > /kernels/rust/kernel.json)
+# Download prebuilt evcxr_jupyter binary
+RUN curl -L https://github.com/google/evcxr/releases/download/v0.14.0/evcxr_jupyter-v0.14.0-x86_64-unknown-linux-gnu.tar.gz | \
+    tar xz -C /tmp/ && \
+    chmod +x /tmp/evcxr_jupyter-v0.14.0-x86_64-unknown-linux-gnu/evcxr_jupyter && \
+    mv /tmp/evcxr_jupyter-v0.14.0-x86_64-unknown-linux-gnu/evcxr_jupyter /usr/local/cargo/bin/ && \
+    rm -rf /tmp/evcxr_jupyter-v0.14.0-x86_64-unknown-linux-gnu
 
-# If installation succeeded, install the kernel
-RUN if command -v evcxr_jupyter >/dev/null 2>&1; then \
-        pip3 install jupyter_client && \
-        evcxr_jupyter --install && \
-        mkdir -p /kernels && \
-        cp -r /root/.local/share/jupyter/kernels/rust /kernels/ 2>/dev/null || \
-        cp -r /usr/local/share/jupyter/kernels/rust /kernels/ 2>/dev/null || \
-        cp -r /usr/share/jupyter/kernels/rust /kernels/ 2>/dev/null || \
-        echo "Rust kernel installation completed but kernel spec not found"; \
-    fi
+# Install jupyter_client and the kernel
+RUN pip3 install jupyter_client && \
+    evcxr_jupyter --install && \
+    mkdir -p /kernels && \
+    cp -r /root/.local/share/jupyter/kernels/rust /kernels/
 
 # =============================================================================
 # Node.js/TypeScript Kernel Stage
