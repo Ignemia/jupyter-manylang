@@ -1,6 +1,6 @@
 MIT License
 
-Copyright (c) 2019 HeRoMo
+Copyright (c) 2025 Jupyter Manylang Project
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -19,3 +19,31 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+
+## Usage and Distribution Policy
+
+This project is designed as a reference implementation and foundation for
+multi-language Jupyter environments. We encourage the following usage patterns:
+
+### ✅ ENCOURAGED USES:
+- Fork this repository for personal, academic, or commercial projects
+- Modify language versions and configurations to suit your needs
+- Create derivative works and specialized distributions
+- Redistribute modified versions under your own branding
+- Use as a foundation for organizational or educational deployments
+- Integrate components into larger software systems
+
+### 📝 CONTRIBUTION APPROACH:
+This project follows a "fork-first" contribution model:
+- Direct pull requests to the main repository are generally not accepted
+- Instead, we encourage forking and sharing your improvements as separate projects
+- Critical security vulnerabilities should be reported via issues
+- Major architectural discussions are welcome in the issues section
+
+### 🎯 RATIONALE:
+This approach allows unlimited customization while maintaining a stable reference
+implementation, enabling diverse use cases without conflicts or feature bloat.
+
+The MIT License above grants you complete freedom to use, modify, and redistribute
+this software in any way you see fit, including commercial use, without any
+obligation to contribute back to the original project.

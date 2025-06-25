@@ -244,41 +244,70 @@ docker system prune -f
 - **Memory Usage**: Recommended 8GB+ RAM for optimal performance
 </text>
 
-## 🤝 Contributing
+## 🍴 Forking and Customization
 
-### Current Priorities
-1. **R Kernel Completion**: Complete the in-progress R kernel build
-2. **Rust Kernel Fix**: Resolve evcxr_jupyter compatibility issues
-3. **C# Kernel Implementation**: Find working .NET Interactive alternative
-4. **Testing & Documentation**: Comprehensive kernel testing and examples
+This project is designed to be **forked and customized** for your specific needs! We encourage you to:
 
-### Contributing Guidelines
-When contributing:
-1. **ALWAYS** read this README and `CONTINUE.md` first
-2. **NEVER** change the specified language versions (C++, Java, Python, C#)
-3. **ALWAYS** build with `./build-composite.sh` before testing
-4. **ALWAYS** test with `docker compose up`
-5. **ALWAYS** verify kernels with `docker exec jupyter-manylang jupyter kernelspec list`
-6. **CHECK** `CONTINUE.md` for current status and known issues
+### ✅ Fork This Project If You Want To:
+- Customize language versions for your organization
+- Add additional programming languages or kernels
+- Modify the JupyterLab configuration
+- Create specialized versions for research or education
+- Build derivative Docker images
+- Integrate with your existing infrastructure
 
-### Development Workflow
+### 🔧 Customization Guidelines
+When forking and customizing:
+1. **Feel free** to modify any language versions to suit your needs
+2. **Customize** the Docker configuration as needed
+3. **Add or remove** kernels based on your requirements
+4. **Modify** JupyterLab settings and extensions
+5. **Rebrand** the project for your organization
+
+### 🚫 Direct Contributions Policy
+**Please do not submit direct pull requests to this repository.** Instead:
+- **Fork the project** and make your changes there
+- **Share your fork** with the community if others might benefit
+- **Create issues** only for critical bugs or security vulnerabilities
+- **Discuss major architectural changes** in issues before implementing
+
+### Development Workflow for Your Fork
 ```bash
-# 1. Make changes to Dockerfile.composite or individual kernel files
-# 2. Build the image
+# 1. Fork this repository to your account
+# 2. Clone your fork
+git clone https://github.com/YOUR-USERNAME/jupyter-manylang.git
+
+# 3. Make your customizations to Dockerfile.composite or other files
+# 4. Build your customized image
 ./build-composite.sh
 
-# 3. Test the container
+# 5. Test your container
 docker compose down && docker compose up -d
 
-# 4. Verify kernels
+# 6. Verify kernels work as expected
 docker exec jupyter-manylang jupyter kernelspec list
 
-# 5. Test specific kernels in JupyterLab at http://localhost:7654
+# 7. Push your changes to your fork
+git add . && git commit -m "Custom modifications" && git push
 ```
+
+### 🎯 Why This Approach?
+This project serves as a **reference implementation** and **foundation** for multi-language Jupyter environments. By encouraging forks rather than direct contributions, we:
+- Keep the main branch stable and focused
+- Allow unlimited customization without conflicts
+- Enable diverse use cases without bloating the core project
+- Maintain clear version specifications while allowing flexibility
 
 ## 📄 License
 
-MIT License - See LICENSE file for details.
+**MIT License** - This project is fully open source and **free to fork, modify, and redistribute**.
+
+- ✅ **Fork freely** for personal, academic, or commercial use
+- ✅ **Modify and redistribute** without restrictions
+- ✅ **Create derivative works** and commercial products
+- ✅ **No attribution required** (but appreciated!)
+
+See `LICENSE.txt` for complete legal details.
 
 ---
 
