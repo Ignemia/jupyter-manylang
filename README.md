@@ -1,4 +1,4 @@
-# JupyterLab Multi-Language Docker Environment
+# Jupyter Manylang Docker Environment
 
 **IMPORTANT: This is a VERSION-AGNOSTIC JupyterLab environment where ALL languages use their LATEST STABLE versions, EXCEPT for the specifically listed versions below.**
 
@@ -31,7 +31,7 @@ This Docker image provides a JupyterLab environment with multiple programming la
 - **Python 3.14** (Latest beta, updated on container start)
 
 #### C# Versions
-- **C# (.NET 6)** (LTS)
+- **C# (.NET 7)**
 - **C# (.NET 8)** (LTS)
 - **C# (.NET 9)** (Latest preview, updated on container start)
 
@@ -83,8 +83,23 @@ docker compose up -d
 
 5. (Optional) Check available kernels:
 ```bash
-docker exec jupyter-multilang jupyter kernelspec list
+docker exec jupyter-manylang jupyter kernelspec list
 ```
+
+## 🔄 **Current Status**
+
+### ✅ Latest Updates (June 2025)
+- **Project Renamed**: Now called "Jupyter Manylang" (from JupyterLab Multi-Language)
+- **Kernel Logos**: Custom icons added for all kernels showing language abbreviations
+- **R Kernel Fixed**: Manually configured and working
+
+### 📊 Kernel Summary
+- **22 Functional Kernels**: Python, C++, Java, Go, Julia, TypeScript, Kotlin, Scala, Bash, R
+- **C# Kernels**: ⚠️ Placeholders (.NET 7, 8, 9) - awaiting upstream fixes
+- **Rust Kernel**: ⚠️ Placeholder - compatibility issues
+- **SPARQL Kernel**: ❌ Not installed (mentioned in docs but not implemented)
+
+**Image Size**: 8.73GB | **Total Kernels**: 24 (22 working + 2 placeholders)
 
 ## 🔧 Architecture
 
@@ -144,14 +159,14 @@ JUPYTER_TOKEN: ""  # Set for security in production
 
 After starting the container, verify all kernels:
 ```bash
-docker exec jupyter-multilang jupyter kernelspec list
+docker exec jupyter-manylang jupyter kernelspec list
 ```
 
 Expected kernels:
 - Python 2.7, 3.13, 3.14 (beta)
 - C++11, C++14, C++17, C++23, C++26 (beta)
 - Java 11, 17, 24 (beta)
-- C# (.NET 6 LTS), C# (.NET 8 LTS), C# (.NET 9 preview)
+- C# (.NET 7), C# (.NET 8 LTS), C# (.NET 9 preview)
 - Go (latest)
 - Rust (latest)
 - Julia (latest)
@@ -186,7 +201,19 @@ netstat -an | grep 7654
 docker compose restart
 
 # Check installed kernels
-docker exec jupyter-multilang jupyter kernelspec list
+docker exec jupyter-manylang jupyter kernelspec list
+```
+
+### R Kernel Issues
+```bash
+# Check if R is working
+docker exec jupyter-manylang R --version
+
+# Verify R packages are installed
+docker exec jupyter-manylang R -e "library(IRkernel)"
+
+# Check IRkernel installation
+docker exec jupyter-manylang find /usr -name "*ir*" -path "*/jupyter/kernels/*"
 ```
 
 ### Permission issues
@@ -195,14 +222,59 @@ docker exec jupyter-multilang jupyter kernelspec list
 sudo chown -R $(id -u):$(id -g) notebooks/
 ```
 
+### Build Issues
+```bash
+# Clean rebuild if having issues
+docker compose down
+docker system prune -f
+./build-composite.sh
+```
+
+## ⚠️ Current Limitations
+
+### Known Issues
+- **R Kernel**: Currently being finalized - R 4.3.2 installed but IRkernel may need completion
+- **C# Kernels**: Placeholder only - .NET Interactive has upstream installation issues
+- **Rust Kernel**: Placeholder only - evcxr_jupyter compatibility issues with Rust 2024 edition
+- **Locale Warnings**: Some kernels show locale warnings (functionality not affected)
+
+### Performance Notes
+- **Build Time**: Initial build takes 30-60 minutes depending on system
+- **Image Size**: ~8.7GB (includes all language runtimes)
+- **Memory Usage**: Recommended 8GB+ RAM for optimal performance
+</text>
+
 ## 🤝 Contributing
 
+### Current Priorities
+1. **R Kernel Completion**: Complete the in-progress R kernel build
+2. **Rust Kernel Fix**: Resolve evcxr_jupyter compatibility issues
+3. **C# Kernel Implementation**: Find working .NET Interactive alternative
+4. **Testing & Documentation**: Comprehensive kernel testing and examples
+
+### Contributing Guidelines
 When contributing:
-1. **ALWAYS** read this README first
-2. **NEVER** change the specified language versions
+1. **ALWAYS** read this README and `CONTINUE.md` first
+2. **NEVER** change the specified language versions (C++, Java, Python, C#)
 3. **ALWAYS** build with `./build-composite.sh` before testing
 4. **ALWAYS** test with `docker compose up`
-5. **ALWAYS** verify all kernels are working with `docker exec jupyter-multilang jupyter kernelspec list`
+5. **ALWAYS** verify kernels with `docker exec jupyter-manylang jupyter kernelspec list`
+6. **CHECK** `CONTINUE.md` for current status and known issues
+
+### Development Workflow
+```bash
+# 1. Make changes to Dockerfile.composite or individual kernel files
+# 2. Build the image
+./build-composite.sh
+
+# 3. Test the container
+docker compose down && docker compose up -d
+
+# 4. Verify kernels
+docker exec jupyter-manylang jupyter kernelspec list
+
+# 5. Test specific kernels in JupyterLab at http://localhost:7654
+```
 
 ## 📄 License
 

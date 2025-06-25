@@ -112,14 +112,43 @@ RUN cd /tmp && \
 # C# Kernels Stage (.NET 7, 8, 9 beta) - Simplified placeholder
 # =============================================================================
 FROM python:3.13-slim-bullseye AS csharp-kernels
-# Skip .NET kernel installation for now - it has compatibility issues
-# Create placeholder kernel directories
+# Install dependencies for .NET
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl wget ca-certificates && rm -rf /var/lib/apt/lists/*
+
+# Install .NET SDKs
+RUN curl -sSL https://dot.net/v1/dotnet-install.sh -o dotnet-install.sh && \
+    chmod +x dotnet-install.sh && \
+    ./dotnet-install.sh --channel 7.0 --install-dir /usr/share/dotnet && \
+    ./dotnet-install.sh --channel 8.0 --install-dir /usr/share/dotnet && \
+    ./dotnet-install.sh --channel 9.0 --quality preview --install-dir /usr/share/dotnet && \
+    rm dotnet-install.sh
+
+# Set up environment
+ENV PATH="/usr/share/dotnet:/root/.dotnet/tools:$PATH"
+ENV DOTNET_ROOT="/usr/share/dotnet"
+ENV DOTNET_CLI_TELEMETRY_OPTOUT=1
+ENV DOTNET_ROLL_FORWARD=LatestMajor
+
+# Install .NET Interactive
+RUN dotnet tool install -g Microsoft.dotnet-interactive --version 1.0.522904
+
+# Install Jupyter and create kernel specs
+RUN pip install jupyter jupyterlab && \
+    dotnet interactive jupyter install
+
+# Create kernel directories with proper configurations
 RUN mkdir -p /kernels/dotnet7-csharp && \
     mkdir -p /kernels/dotnet8-csharp && \
     mkdir -p /kernels/dotnet9-csharp && \
-    echo '{"display_name": "C# (.NET 7) - Not Installed", "argv": ["echo", "C# kernel not installed"], "language": "csharp"}' > /kernels/dotnet7-csharp/kernel.json && \
-    echo '{"display_name": "C# (.NET 8 LTS) - Not Installed", "argv": ["echo", "C# kernel not installed"], "language": "csharp"}' > /kernels/dotnet8-csharp/kernel.json && \
-    echo '{"display_name": "C# (.NET 9 Preview) - Not Installed", "argv": ["echo", "C# kernel not installed"], "language": "csharp"}' > /kernels/dotnet9-csharp/kernel.json
+    # Copy the installed kernel files
+    cp -r /root/.local/share/jupyter/kernels/.net-csharp/* /kernels/dotnet7-csharp/ && \
+    cp -r /root/.local/share/jupyter/kernels/.net-csharp/* /kernels/dotnet8-csharp/ && \
+    cp -r /root/.local/share/jupyter/kernels/.net-csharp/* /kernels/dotnet9-csharp/ && \
+    # Update display names
+    sed -i 's/"display_name": ".*"/"display_name": "C# (.NET 7)"/' /kernels/dotnet7-csharp/kernel.json && \
+    sed -i 's/"display_name": ".*"/"display_name": "C# (.NET 8 LTS)"/' /kernels/dotnet8-csharp/kernel.json && \
+    sed -i 's/"display_name": ".*"/"display_name": "C# (.NET 9 Preview)"/' /kernels/dotnet9-csharp/kernel.json
 
 # =============================================================================
 # Go Kernel Stage
@@ -152,16 +181,28 @@ RUN julia -e 'using Pkg; Pkg.add("IJulia"); Pkg.add(["DataFrames", "CSV", "Plots
 # =============================================================================
 FROM rust:1.83-bullseye AS rust-kernels
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    cmake pkg-config libssl-dev libzmq3-dev && rm -rf /var/lib/apt/lists/*
+    cmake pkg-config libssl-dev libzmq3-dev jupyter-client python3 python3-pip && rm -rf /var/lib/apt/lists/*
 
 ENV RUSTUP_HOME=/usr/local/rustup
 ENV CARGO_HOME=/usr/local/cargo
 ENV PATH=/usr/local/cargo/bin:$PATH
 
-# Skip Rust kernel installation due to compatibility issues
-# Create a placeholder kernel instead
-RUN mkdir -p /kernels/rust && \
-    echo '{"display_name": "Rust - Not Installed", "argv": ["echo", "Rust kernel not installed due to compatibility issues"], "language": "rust"}' > /kernels/rust/kernel.json
+# Try to install an older version of evcxr_jupyter that might work
+RUN cargo install evcxr_jupyter --version 0.14.2 || \
+    (echo "Falling back to placeholder kernel" && \
+     mkdir -p /kernels/rust && \
+     echo '{"display_name": "Rust", "argv": ["echo", "Rust kernel not available - evcxr_jupyter installation failed"], "language": "rust"}' > /kernels/rust/kernel.json)
+
+# If installation succeeded, install the kernel
+RUN if command -v evcxr_jupyter >/dev/null 2>&1; then \
+        pip3 install jupyter_client && \
+        evcxr_jupyter --install && \
+        mkdir -p /kernels && \
+        cp -r /root/.local/share/jupyter/kernels/rust /kernels/ 2>/dev/null || \
+        cp -r /usr/local/share/jupyter/kernels/rust /kernels/ 2>/dev/null || \
+        cp -r /usr/share/jupyter/kernels/rust /kernels/ 2>/dev/null || \
+        echo "Rust kernel installation completed but kernel spec not found"; \
+    fi
 
 # =============================================================================
 # Node.js/TypeScript Kernel Stage
@@ -190,11 +231,39 @@ RUN npm install -g typescript tslab && \
 # =============================================================================
 # R Kernel Stage
 # =============================================================================
-FROM python:3.13-slim-bullseye AS r-kernels
-# Skip R kernel installation due to package installation issues
-# Create a placeholder kernel instead
-RUN mkdir -p /kernels/ir && \
-    echo '{"display_name": "R - Not Installed", "argv": ["echo", "R kernel not installed due to package installation issues"], "language": "R"}' > /kernels/ir/kernel.json
+FROM r-base:4.3.2 AS r-kernels
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    python3 \
+    python3-pip \
+    libcurl4-openssl-dev \
+    libssl-dev \
+    libxml2-dev \
+    libgit2-dev \
+    libzmq3-dev \
+    libczmq-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Jupyter (required for IRkernel installation)
+RUN pip3 install --break-system-packages jupyter jupyterlab notebook
+
+# Install IRkernel and common R packages
+RUN R -e "install.packages(c('IRkernel', 'ggplot2', 'dplyr', 'tidyr', 'readr', 'tibble', 'purrr', 'forcats', 'stringr', 'lubridate'), repos='https://cloud.r-project.org')"
+
+# Install additional useful packages
+RUN R -e "install.packages(c('knitr', 'rmarkdown', 'shiny', 'plotly', 'DT', 'caret', 'randomForest'), repos='https://cloud.r-project.org')"
+
+# Install the kernel spec
+RUN R -e "IRkernel::installspec(sys_prefix = TRUE)"
+
+# Create kernels output directory and copy kernel spec
+RUN mkdir -p /kernels && \
+    # Find and copy R kernel (it could be in different locations)
+    (find /usr/local/share/jupyter/kernels -name "ir" -type d -exec cp -r {} /kernels/ \; 2>/dev/null || \
+     find /usr/share/jupyter/kernels -name "ir" -type d -exec cp -r {} /kernels/ \; 2>/dev/null || \
+     find /root/.local/share/jupyter/kernels -name "ir" -type d -exec cp -r {} /kernels/ \; 2>/dev/null || \
+     (mkdir -p /kernels/ir && echo '{"display_name": "R", "argv": ["R", "--slave", "-e", "IRkernel::main()", "--args", "{connection_file}"], "language": "R"}' > /kernels/ir/kernel.json))
 
 # =============================================================================
 # Other Kernels Stage (Kotlin, Scala, Bash, SPARQL)
@@ -238,9 +307,9 @@ RUN mkdir -p /kernels && \
 # =============================================================================
 # Final Stage - Combine all kernels
 # =============================================================================
-FROM python:3.13-bullseye
+FROM python:3.13-bookworm
 
-LABEL maintainer="JupyterLab Multi-Language Environment"
+LABEL maintainer="Jupyter Manylang"
 LABEL description="Version-agnostic with specific exceptions for C++, Java, Python, and C#"
 LABEL version="6.0.0"
 
@@ -266,14 +335,15 @@ RUN apt-get update && apt-get upgrade -y && \
     xz-utils tk-dev libxml2-dev libxmlsec1-dev liblzma-dev \
     # R dependencies
     libcurl4-openssl-dev libgit2-dev libblas-dev liblapack-dev \
+    r-base-dev \
     # Archive tools
     unzip tar gzip \
     # Locales and fonts
     locales fonts-liberation fonts-dejavu-core \
-    # Python 2.7
-    python2.7 python2.7-dev \
-    # .NET dependencies
-    libc6 libgcc1 libgssapi-krb5-2 libicu67 libstdc++6 zlib1g \
+    # .NET and R dependencies
+    libc6 libgcc1 libgssapi-krb5-2 libicu72 libstdc++6 zlib1g \
+    # Additional ICU runtime packages for R compatibility
+    libicu-dev \
     && locale-gen en_US.UTF-8 \
     && rm -rf /var/lib/apt/lists/*
 
@@ -307,7 +377,24 @@ COPY --from=rust-kernels /usr/local/cargo /usr/local/cargo
 # Node.js
 COPY --from=nodejs-kernels /usr/local/bin/node /usr/local/bin/node
 COPY --from=nodejs-kernels /usr/local/lib/node_modules /usr/local/lib/node_modules
-# R - Only placeholder kernel (no R installation)
+# .NET installation
+COPY --from=csharp-kernels /usr/share/dotnet /usr/share/dotnet
+COPY --from=csharp-kernels /root/.dotnet /root/.dotnet
+ENV PATH="/usr/share/dotnet:/root/.dotnet/tools:$PATH"
+ENV DOTNET_ROOT="/usr/share/dotnet"
+ENV DOTNET_CLI_TELEMETRY_OPTOUT=1
+ENV DOTNET_ROLL_FORWARD=LatestMajor
+
+# R installation
+COPY --from=r-kernels /usr/lib/R /usr/lib/R
+COPY --from=r-kernels /usr/bin/R /usr/bin/R
+COPY --from=r-kernels /usr/bin/Rscript /usr/bin/Rscript
+COPY --from=r-kernels /etc/R /etc/R
+
+# Copy ICU libraries required by R
+COPY --from=r-kernels /lib/x86_64-linux-gnu/libicuuc.so.72 /lib/x86_64-linux-gnu/libicuuc.so.72
+COPY --from=r-kernels /lib/x86_64-linux-gnu/libicui18n.so.72 /lib/x86_64-linux-gnu/libicui18n.so.72
+COPY --from=r-kernels /lib/x86_64-linux-gnu/libicudata.so.72 /lib/x86_64-linux-gnu/libicudata.so.72
 # Python 3.14
 COPY --from=python-kernels /opt/python3.14 /opt/python3.14
 
@@ -350,13 +437,40 @@ RUN cp -r /tmp/rust-kernels/* /usr/local/share/jupyter/kernels/ 2>/dev/null || t
 COPY --from=nodejs-kernels /kernels /tmp/nodejs-kernels
 RUN cp -r /tmp/nodejs-kernels/* /usr/local/share/jupyter/kernels/ 2>/dev/null || true && rm -rf /tmp/nodejs-kernels
 
-# Copy R kernel
+# Copy R packages and kernel from r-kernels stage
+COPY --from=r-kernels /usr/local/lib/R /usr/local/lib/R
+COPY --from=r-kernels /usr/lib/R/site-library /usr/lib/R/site-library
 COPY --from=r-kernels /kernels /tmp/r-kernels
 RUN cp -r /tmp/r-kernels/* /usr/local/share/jupyter/kernels/ 2>/dev/null || true && rm -rf /tmp/r-kernels
 
 # Copy other kernels
 COPY --from=other-kernels /kernels /tmp/other-kernels
 RUN cp -r /tmp/other-kernels/* /usr/local/share/jupyter/kernels/ 2>/dev/null || true && rm -rf /tmp/other-kernels
+
+# Copy kernel logos
+COPY kernel-logos/python2.7/logo-*.png /usr/local/share/jupyter/kernels/python2.7/
+COPY kernel-logos/python3/logo-*.png /usr/local/share/jupyter/kernels/python3/
+COPY kernel-logos/python3.13/logo-*.png /usr/local/share/jupyter/kernels/python3.13/
+COPY kernel-logos/python3.14/logo-*.png /usr/local/share/jupyter/kernels/python3.14/
+COPY kernel-logos/cpp11/logo-*.png /usr/local/share/jupyter/kernels/cpp11/
+COPY kernel-logos/cpp14/logo-*.png /usr/local/share/jupyter/kernels/cpp14/
+COPY kernel-logos/cpp17/logo-*.png /usr/local/share/jupyter/kernels/cpp17/
+COPY kernel-logos/cpp23/logo-*.png /usr/local/share/jupyter/kernels/cpp23/
+COPY kernel-logos/cpp26/logo-*.png /usr/local/share/jupyter/kernels/cpp26/
+COPY kernel-logos/java11/logo-*.png /usr/local/share/jupyter/kernels/java11/
+COPY kernel-logos/java17/logo-*.png /usr/local/share/jupyter/kernels/java17/
+COPY kernel-logos/dotnet7-csharp/logo-*.png /usr/local/share/jupyter/kernels/dotnet7-csharp/
+COPY kernel-logos/dotnet8-csharp/logo-*.png /usr/local/share/jupyter/kernels/dotnet8-csharp/
+COPY kernel-logos/dotnet9-csharp/logo-*.png /usr/local/share/jupyter/kernels/dotnet9-csharp/
+COPY kernel-logos/gophernotes/logo-*.png /usr/local/share/jupyter/kernels/gophernotes/
+COPY kernel-logos/julia-1.11/logo-*.png /usr/local/share/jupyter/kernels/julia-1.11/
+COPY kernel-logos/rust/logo-*.png /usr/local/share/jupyter/kernels/rust/
+COPY kernel-logos/tslab/logo-*.png /usr/local/share/jupyter/kernels/tslab/
+COPY kernel-logos/ir/logo-*.png /usr/local/share/jupyter/kernels/ir/
+COPY kernel-logos/kotlin/logo-*.png /usr/local/share/jupyter/kernels/kotlin/
+COPY kernel-logos/scala/logo-*.png /usr/local/share/jupyter/kernels/scala/
+COPY kernel-logos/bash/logo-*.png /usr/local/share/jupyter/kernels/bash/
+COPY kernel-logos/sparql/logo-*.png /usr/local/share/jupyter/kernels/sparql/
 
 # Environment variables
 ENV PATH=/opt/miniconda/bin:$PATH
@@ -368,6 +482,8 @@ ENV RUSTUP_HOME=/usr/local/rustup
 ENV CARGO_HOME=/usr/local/cargo
 ENV PATH=/usr/local/cargo/bin:$PATH
 ENV PATH=/usr/local/bin:$PATH
+ENV R_HOME=/usr/lib/R
+ENV PATH=/usr/bin:$PATH
 ENV NOTEBOOK_DIR=/notebooks
 ENV JUPYTER_CONFIG_DIR=/config
 

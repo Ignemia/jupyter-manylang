@@ -44,7 +44,7 @@ docker compose build
 docker compose up
 
 # Verify all kernels are available
-docker exec jupyter-multilang jupyter kernelspec list
+docker exec jupyter-manylang jupyter kernelspec list
 
 # Test each language kernel
 # Create test notebooks for each language version

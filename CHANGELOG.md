@@ -69,5 +69,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Option to run without root privileges
 - Isolated kernel environments
 
-[Unreleased]: https://github.com/yourusername/jupyter-multilang/compare/v1.0.0...HEAD
-[1.0.0]: https://github.com/yourusername/jupyter-multilang/releases/tag/v1.0.0
+[Unreleased]: https://github.com/yourusername/jupyter-manylang/compare/v1.0.0...HEAD
+[1.0.0]: https://github.com/yourusername/jupyter-manylang/releases/tag/v1.0.0

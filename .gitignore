@@ -285,6 +285,7 @@ config/custom_*
 .jupyter/
 .local/
 .ipython/
+kernel-logos/
 
 # Keep important files
 !.gitignore
